@@ -55,7 +55,7 @@ coverage/
 .vscode/
 
 # Webpack config
-webpack.config.js
+#webpack.config.js
 
 # Babel config
 .babelrc
