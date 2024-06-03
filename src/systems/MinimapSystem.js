@@ -2,6 +2,7 @@ import { System } from 'ecsy';
 import { MinimapComponent } from '../components/MinimapComponent.js';
 import { MapComponent } from '../components/MapComponent.js';
 import { WebGLRendererComponent } from '../../lib/ecs/components/WebGLRendererComponent.js';
+import { LightComponent } from '../components/LightComponent.js';
 
 class MinimapSystem extends System {
   init() {
@@ -56,6 +57,20 @@ class MinimapSystem extends System {
 
     minimap.context.strokeStyle = '#0000ff';
     minimap.context.strokeRect(camX - 10, camY - 10, 20, 20);
+
+    // Draw the lights
+    this.queries.lights.results.forEach((entity) => {
+      const light = entity.getComponent(LightComponent);
+      const lightX =
+        minimap.width - ((light.position.x + map.width / 2) / map.width) * minimap.width;
+      const lightY =
+        minimap.height - ((light.position.z + map.height / 2) / map.height) * minimap.height;
+
+      minimap.context.fillStyle = light.color;
+      minimap.context.beginPath();
+      minimap.context.arc(lightX, lightY, 5, 0, 2 * Math.PI);
+      minimap.context.fill();
+    });
   }
 
   handleMinimapClick(event) {
@@ -149,7 +164,8 @@ class MinimapSystem extends System {
 MinimapSystem.queries = {
   minimap: { components: [MinimapComponent] },
   map: { components: [MapComponent] },
-  renderer: { components: [WebGLRendererComponent] }
+  renderer: { components: [WebGLRendererComponent] },
+  lights: { components: [LightComponent] }
 };
 
 export { MinimapSystem };

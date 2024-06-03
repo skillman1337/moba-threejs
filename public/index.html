@@ -7,21 +7,39 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="debug-hud">
+      <div id="character-info"></div>
+      <button id="toggle-light-controls">Toggle Light Controls</button>
+      <div id="light-controls" style="display: none">
+        <div>
+          <label for="light0-color">Light 0 Color:</label>
+          <input type="color" id="light0-color" value="#FFFFFF" />
+          <label for="light0-intensity">Intensity:</label>
+          <input type="range" id="light0-intensity" min="0" max="50" step="0.1" value="7.5" />
+        </div>
+        <div>
+          <label for="light1-color">Light 1 Color:</label>
+          <input type="color" id="light1-color" value="#0000B2" />
+          <label for="light1-intensity">Intensity:</label>
+          <input type="range" id="light1-intensity" min="0" max="500" step="0.1" value="12.5" />
+        </div>
+        <div>
+          <label for="light2-color">Light 2 Color:</label>
+          <input type="color" id="light2-color" value="#00293A" />
+          <label for="light2-intensity">Intensity:</label>
+          <input type="range" id="light2-intensity" min="0" max="500" step="0.1" value="25" />
+        </div>
+      </div>
+      <div id="tone-mapping-controls" style="display: none">
+        <label for="tone-mapping-selector">Tone Mapping:</label>
+        <select id="tone-mapping-selector"></select>
+        <label for="tone-mapping-exposure">Tone Mapping Exposure:</label>
+        <input type="range" id="tone-mapping-exposure" min="1" max="10" step="0.1" value="1" />
+      </div>
+    </div>
     <div id="minimap-container">
       <canvas id="minimap"></canvas>
     </div>
-    <!-- <div id="debug-toolbar">
-        <h3>Camera Debug Toolbar</h3>
-        <div>
-            <label>Position:</label>
-            <span id="camera-position"></span>
-        </div>
-        <div>
-            <label>Rotation:</label>
-            <span id="camera-rotation"></span>
-        </div>
-        <button id="reset-camera">Reset Camera</button>
-    </div> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="bundle.js"></script>
   </body>

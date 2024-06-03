@@ -1,6 +1,8 @@
+// src\index.js
 import { ECSYThreeWorld } from '../lib/ecs/world.js';
 import { setupRenderer, setupScene, setupCamera } from './gameSetup.js';
 import { registerComponentsAndSystems } from './gameSetup.js';
+import { directionalLight0, directionalLight1, directionalLight2 } from './config/lightConfig.js';
 import {
   Clock,
   DirectionalLight,
@@ -19,6 +21,7 @@ import TWEEN from '@tweenjs/tween.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CharacterComponent } from './components/CharacterComponent.js';
 import { CharacterSoundComponent } from './components/CharacterSoundComponent.js';
+import { LightComponent } from './components/LightComponent.js';
 
 // Create the ECSY world
 const world = new ECSYThreeWorld();
@@ -91,12 +94,8 @@ async function loadMap() {
         // Disable depth test for all materials in the object
         object.traverse((child) => {
           if (child.isMesh) {
-            console.log(child.material);
             if (child.material.transparent) {
-              console.log(child.material);
               child.renderOrder = 1;
-              console.log('check');
-              console.log(child);
             }
           }
         });
@@ -104,35 +103,32 @@ async function loadMap() {
         scene.add(object);
 
         // Add some simple lighting (notrequired for MeshBasicMaterial since it doesn't affect it)
-        // const ambientLight = new AmbientLight('white'); // light gray ambient light
-        // ambientLight.position.set(69.36, 25, -4.18);
-        // scene.add(ambientLight);
+        //const ambientLight = new AmbientLight('white'); // light gray ambient light
+        //ambientLight.position.set(69.36, 25, -4.18);
+        //scene.add(ambientLight);
 
         // White directional light at half intensity shining from the top.
 
         // LIGHT 1
 
-        // const lightStrength = 20;
-        // const light0 = new DirectionalLight('#5AA3A8', lightStrength + 5);
-        // light0.position.set(0, 55, 0); // Adjust the position as needed
-        // //scene.add(light0);
+        //const lightStrength = 20;
+        //const light0 = new DirectionalLight('#5AA3A8', lightStrength + 5);
+        //light0.position.set(0, 55, 0); // Adjust the position as needed
+        //scene.add(light0);
 
-        // // LIGHT 2
-        // const light1 = new DirectionalLight('#529B80', lightStrength + 10);
-        // light1.position.set(80, 55, 25); // Adjust the position as needed
-        // scene.add(light1);
+        // LIGHT 2
+        //const light1 = new DirectionalLight('#529B80', lightStrength + 10);
+        //light1.position.set(80, 55, 25); // Adjust the position as needed
+        //scene.add(light1);
 
         // // LIGHT 3
-        const directionalLight = new DirectionalLight('#95BEE4', 100);
-        directionalLight.position.set(5, 62.826, -9.523); // Adjust the position as needed
-        scene.add(directionalLight);
 
         // Light 4
         // Z up and down
         // Y depth
         // @TODO
-        const shopLight = new PointLight('#FFFFFF', 100, 3.24, 2.32);
-        shopLight.position.set(70.178, 2.015, -2.83); // Adjust the position as needed
+        const shopLight = new PointLight('#534934', 2500, 3.24, 2.32);
+        shopLight.position.set(72, 5, 2.5); // Adjust the position as needed
         scene.add(shopLight);
 
         resolve(object);
@@ -145,6 +141,14 @@ async function loadMap() {
     );
   });
 }
+
+function setupLights() {
+  scene.add(directionalLight0);
+  scene.add(directionalLight1);
+  scene.add(directionalLight2);
+}
+
+setupLights();
 
 let mixer = null; // Declare mixer globally
 

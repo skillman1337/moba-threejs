@@ -1,4 +1,11 @@
-import { WebGLRenderer, MathUtils } from 'three';
+// src\gameSetup.js
+import {
+  WebGLRenderer,
+  MathUtils,
+  ACESFilmicToneMapping,
+  ColorManagement,
+  SRGBColorSpace
+} from 'three';
 import { WebGLRendererComponent } from '../lib/ecs/components/WebGLRendererComponent.js';
 import { MinimapComponent } from './components/MinimapComponent.js';
 import { MapComponent } from './components/MapComponent.js';
@@ -6,7 +13,11 @@ import { InputStateComponent } from './components/InputStateComponent.js';
 import { CharacterComponent } from './components/CharacterComponent.js';
 import { CharacterSoundComponent } from './components/CharacterSoundComponent.js';
 import { PerspectiveCamera, Scene, Color, PCFSoftShadowMap, NeutralToneMapping } from 'three';
-import { PHYSICALLY_CORRECT_LIGHTS } from './config/renderConfig.js';
+import {
+  PHYSICALLY_CORRECT_LIGHTS,
+  toneMapping,
+  toneMappingExposure
+} from './config/renderConfig.js';
 import { WebGLRendererSystem } from '../lib/ecs/systems/WebGLRendererSystem.js';
 import { MinimapSystem } from './systems/MinimapSystem.js';
 import { CameraMovementSystem } from './systems/CameraMovementSystem.js';
@@ -27,6 +38,8 @@ import {
   FOV,
   NEAR_CLIPPING_PLANE
 } from './config/cameraConfig.js';
+import { DebugHudSystem } from './systems/DebugHudSystem.js';
+import { LightComponent } from './components/LightComponent.js';
 
 export function registerComponentsAndSystems(world) {
   world
@@ -36,12 +49,14 @@ export function registerComponentsAndSystems(world) {
     .registerComponent(InputStateComponent)
     .registerComponent(CharacterComponent)
     .registerComponent(CharacterSoundComponent)
+    .registerComponent(LightComponent)
     .registerSystem(WebGLRendererSystem, { priority: 999 })
     .registerSystem(MinimapSystem)
     .registerSystem(CameraMovementSystem)
     .registerSystem(InputSystem)
     .registerSystem(CharacterControlSystem)
     .registerSystem(CharacterSoundSystem)
+    .registerSystem(DebugHudSystem)
     .registerSystem(MusicSystem); // Register the MusicSystem
 }
 
@@ -49,14 +64,14 @@ export function setupRenderer(world, sceneEntity, cameraEntity) {
   const renderer = new WebGLRenderer({
     antialias: true
   });
-  // renderer.physicallyCorrectLights = PHYSICALLY_CORRECT_LIGHTS;
-  // renderer.gammaOutput = true;
-  // renderer.gammaFactor = 2.2;
   renderer.setPixelRatio(window.devicePixelRatio); // set the pixel ratio so that our scene will look good on HiDPI displays
-  renderer.toneMapping = NeutralToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMapping = toneMapping; // Choose a tone mapping algorithm
+  renderer.toneMappingExposure = toneMappingExposure; // Brightness
+  //renderer.outputColorSpace = 'srgb'; // srgb or srgb-linear, srgb is default
   // renderer.shadowMap.enabled = false;
   // renderer.shadowMap.type = PCFSoftShadowMap;
+  ColorManagement.enabled = true;
+
   document.body.appendChild(renderer.domElement);
 
   // Create renderer component and associate the camera

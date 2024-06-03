@@ -18,28 +18,68 @@ body {
   height: 100%;
 }
 
-#debug-toolbar {
-  position: absolute;
-  right: 20px;
-  top: 20px;
-  width: 200px;
+#debug-hud {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 55;
+  color: white;
+  font-family: fangsong;
+  width: auto;
+  max-width: 90%;
+  transition: opacity 0.3s ease-in-out;
   padding: 10px;
-  background-color: rgba(255, 255, 255, 0.8);
-  border: 1px solid #ccc;
-  z-index: 1000;
+  border-radius: 5px;
+  background-color: rgba(0, 0, 0, 0.8);
 }
 
-#debug-toolbar h3 {
-  margin-top: 0;
+#debug-hud button {
+  background-color: #091b29;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  margin-bottom: 10px; /* Adds space below the button */
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  width: 100%; /* Makes the button stretch to the width of the container */
 }
 
-#debug-toolbar label {
-  display: inline-block;
-  width: 70px;
-  font-weight: bold;
+#debug-hud button:hover,
+#debug-hud button:focus {
+  background-color: #1c777e;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-#debug-toolbar button {
-  margin-top: 10px;
+#debug-hud #character-info,
+#debug-hud #light-controls {
+  margin-bottom: 20px;
+}
+
+#debug-hud div {
+  margin-bottom: 10px;
+}
+
+#debug-hud label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+#debug-hud input[type='color'],
+#debug-hud input[type='range'] {
+  display: block;
   width: 100%;
+  margin-bottom: 5px;
+  cursor: pointer;
+}
+
+#debug-hud input[type='range'] {
+  height: 25px;
+}
+
+#debug-hud #light-controls div {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 5px;
+  border-radius: 3px;
 }
