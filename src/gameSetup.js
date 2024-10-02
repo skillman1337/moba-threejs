@@ -12,6 +12,7 @@ import { MapComponent } from './components/MapComponent.js';
 import { InputStateComponent } from './components/InputStateComponent.js';
 import { CharacterComponent } from './components/CharacterComponent.js';
 import { CharacterSoundComponent } from './components/CharacterSoundComponent.js';
+import { PathfindingComponent } from './components/PathfindingComponent.js';
 import { PerspectiveCamera, Scene, Color, PCFSoftShadowMap, NeutralToneMapping } from 'three';
 import {
   PHYSICALLY_CORRECT_LIGHTS,
@@ -49,6 +50,7 @@ export function registerComponentsAndSystems(world) {
     .registerComponent(InputStateComponent)
     .registerComponent(CharacterComponent)
     .registerComponent(CharacterSoundComponent)
+    .registerComponent(PathfindingComponent)
     .registerComponent(LightComponent)
     .registerSystem(WebGLRendererSystem, { priority: 999 })
     .registerSystem(MinimapSystem)

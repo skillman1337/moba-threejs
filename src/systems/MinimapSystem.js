@@ -16,7 +16,7 @@ class MinimapSystem extends System {
   execute(delta, time) {
     let minimapQuery = this.queries.minimap.results;
     if (minimapQuery.length == 0) {
-      console.error('Minimap not found.');
+      //console.error('Minimap not found.');
       return;
     }
     let mapQuery = this.queries.map.results;

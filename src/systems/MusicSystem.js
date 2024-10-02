@@ -1,6 +1,7 @@
 import { System } from 'ecsy';
 import { AudioLoader, AudioListener, Audio } from 'three';
 import { WebGLRendererComponent } from '../../lib/ecs/components/WebGLRendererComponent';
+
 class MusicSystem extends System {
   init() {
     this.currentTrackIndex = 0;
@@ -12,7 +13,10 @@ class MusicSystem extends System {
     ];
     this.ambientTrack = '/assets/sound/GameAmbientEvent_bank00/3_LoL_TreelineAmbience_Final.wav';
 
-    this.mainTrack = null;
+    this.mainTrackBuffers = []; // To store preloaded AudioBuffers
+    this.ambientTrackBuffer = null;
+    this.currentMainAudio = null;
+
     this.ambientTrackInstance = null;
     this.isAmbientTrackPlaying = false;
     this.listener = new AudioListener();
@@ -27,10 +31,54 @@ class MusicSystem extends System {
     // Add event listeners to resume AudioContext on any user interaction
     document.addEventListener('click', this.resumeAudioContext.bind(this), { once: true });
     document.addEventListener('keydown', this.resumeAudioContext.bind(this), { once: true });
+
+    // Preload all main tracks and ambient track
+    this.preloadTracks();
+  }
+
+  preloadTracks() {
+    const audioLoader = new AudioLoader();
+    const trackPromises = this.tracks.map((url) => this.loadAudioBuffer(audioLoader, url));
+    const ambientPromise = this.loadAudioBuffer(audioLoader, this.ambientTrack);
+
+    // Preload all main tracks
+    Promise.all(trackPromises)
+      .then((buffers) => {
+        this.mainTrackBuffers = buffers;
+        //console.log('All main tracks preloaded.');
+      })
+      .catch((error) => {
+        console.error('Error preloading main tracks:', error);
+      });
+
+    // Preload ambient track
+    ambientPromise
+      .then((buffer) => {
+        this.ambientTrackBuffer = buffer;
+        //console.log('Ambient track preloaded.');
+      })
+      .catch((error) => {
+        console.error('Error preloading ambient track:', error);
+      });
+  }
+
+  loadAudioBuffer(audioLoader, url) {
+    return new Promise((resolve, reject) => {
+      audioLoader.load(
+        url,
+        (buffer) => {
+          resolve(buffer);
+        },
+        undefined,
+        (error) => {
+          reject(error);
+        }
+      );
+    });
   }
 
   resumeAudioContext() {
-    console.log('Resuming audio context...');
+    // console.log('Resuming audio context...');
     if (this.listener.context.state === 'suspended') {
       this.listener.context.resume().then(() => {
         console.log('Audio context resumed.');
@@ -42,66 +90,64 @@ class MusicSystem extends System {
   }
 
   playInitialTracks() {
-    // Play the main track and ambient track only once
-    if (!this.mainTrack) {
-      this.loadAndPlayTrack(this.tracks[this.currentTrackIndex]);
+    // Play the first main track if buffers are loaded
+    if (!this.currentMainAudio && this.mainTrackBuffers.length > 0) {
+      this.playMainTrack(this.currentTrackIndex);
     }
-    if (!this.isAmbientTrackPlaying) {
-      this.loadAndPlayAmbientTrack(this.ambientTrack);
+
+    // Play the ambient track if buffer is loaded and not already playing
+    if (!this.isAmbientTrackPlaying && this.ambientTrackBuffer) {
+      this.playAmbientTrack();
       this.isAmbientTrackPlaying = true;
     }
   }
 
-  loadAndPlayTrack(url) {
-    if (this.mainTrack) {
-      this.mainTrack.stop();
+  playMainTrack(index) {
+    // Prepare the next audio
+    const buffer = this.mainTrackBuffers[index];
+    if (!buffer) {
+      console.error(`No buffer found for main track index ${index}`);
+      return;
     }
 
-    const audioLoader = new AudioLoader();
-    audioLoader.load(
-      url,
-      (buffer) => {
-        this.playMainTrack(buffer);
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading audio file:', error);
-      }
-    );
+    const nextAudio = new Audio(this.listener);
+    nextAudio.setBuffer(buffer);
+    nextAudio.setLoop(false);
+    nextAudio.setVolume(1.0); // Set volume to full immediately
+    nextAudio.play();
+
+    // Assign the onended event properly
+    if (nextAudio.source) {
+      nextAudio.source.onended = this.onMainTrackEnded.bind(this);
+    } else {
+      // If source not yet available, set a flag
+      this.pendingMainTrackEnded = true;
+    }
+
+    // Stop the current audio immediately without fading
+    if (this.currentMainAudio) {
+      this.currentMainAudio.stop();
+    }
+
+    // Set the new audio as current
+    this.currentMainAudio = nextAudio;
   }
 
-  loadAndPlayAmbientTrack(url) {
-    const audioLoader = new AudioLoader();
-    audioLoader.load(
-      url,
-      (buffer) => {
-        this.playAmbientTrack(buffer);
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading ambient audio file:', error);
-      }
-    );
-  }
+  playAmbientTrack() {
+    if (!this.ambientTrackBuffer) {
+      console.error('Ambient track buffer not loaded.');
+      return;
+    }
 
-  playMainTrack(buffer) {
-    this.mainTrack = new Audio(this.listener);
-    this.mainTrack.setBuffer(buffer);
-    this.mainTrack.setLoop(false);
-    this.mainTrack.setVolume(1.0);
-    this.mainTrack.play();
-    this.mainTrack.onEnded = this.onMainTrackEnded.bind(this);
-  }
-
-  playAmbientTrack(buffer) {
     this.ambientTrackInstance = new Audio(this.listener);
-    this.ambientTrackInstance.setBuffer(buffer);
+    this.ambientTrackInstance.setBuffer(this.ambientTrackBuffer);
     this.ambientTrackInstance.setLoop(true);
     this.ambientTrackInstance.setVolume(1.0);
     this.ambientTrackInstance.play();
   }
 
   onMainTrackEnded() {
+    // console.log(`Track ${this.currentTrackIndex + 1} ended.`);
     switch (this.currentTrackIndex) {
       case 0:
         this.currentTrackIndex = 1;
@@ -119,7 +165,16 @@ class MusicSystem extends System {
         break;
     }
 
-    this.loadAndPlayTrack(this.tracks[this.currentTrackIndex]);
+    // console.log(`Playing track ${this.currentTrackIndex + 1}.`);
+    this.playMainTrack(this.currentTrackIndex);
+  }
+
+  execute(delta, time) {
+    // Check if the source is available and assign the onended handler if pending
+    if (this.pendingMainTrackEnded && this.currentMainAudio.source) {
+      this.currentMainAudio.source.onended = this.onMainTrackEnded.bind(this);
+      this.pendingMainTrackEnded = false;
+    }
   }
 }
 

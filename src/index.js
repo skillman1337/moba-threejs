@@ -1,27 +1,35 @@
-// src\index.js
+// src/index.js
 import { ECSYThreeWorld } from '../lib/ecs/world.js';
-import { setupRenderer, setupScene, setupCamera } from './gameSetup.js';
-import { registerComponentsAndSystems } from './gameSetup.js';
+import {
+  setupRenderer,
+  setupScene,
+  setupCamera,
+  registerComponentsAndSystems
+} from './gameSetup.js';
 import { directionalLight0, directionalLight1, directionalLight2 } from './config/lightConfig.js';
 import {
   Clock,
-  DirectionalLight,
+  PointLight,
+  AmbientLight,
+  Raycaster,
+  Color,
+  SphereGeometry,
+  Mesh,
   Box3,
   Vector3,
-  Raycaster,
   AnimationMixer,
-  LoopRepeat,
-  PointLight,
-  AmbientLight
+  LoopRepeat
 } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import TWEEN from '@tweenjs/tween.js';
+
 import { MapComponent } from './components/MapComponent.js';
 import { MinimapComponent } from './components/MinimapComponent.js';
 import { InputStateComponent } from './components/InputStateComponent.js';
-import TWEEN from '@tweenjs/tween.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CharacterComponent } from './components/CharacterComponent.js';
 import { CharacterSoundComponent } from './components/CharacterSoundComponent.js';
-import { LightComponent } from './components/LightComponent.js';
+import { Pathfinding, PathfindingHelper } from 'three-pathfinding';
+import { PathfindingComponent } from './components/PathfindingComponent.js';
 
 // Create the ECSY world
 const world = new ECSYThreeWorld();
@@ -32,7 +40,23 @@ registerComponentsAndSystems(world);
 // Setup renderer, scene, and camera
 const { scene, sceneEntity } = setupScene(world);
 const { cameraEntity } = setupCamera(world, sceneEntity);
-const { renderer } = setupRenderer(world, sceneEntity, cameraEntity);
+setupRenderer(world, sceneEntity, cameraEntity);
+
+// Setup lights
+function setupLights() {
+  scene.add(directionalLight0);
+  scene.add(directionalLight1);
+  scene.add(directionalLight2);
+
+  // Add ambient light
+  const ambientLight = new AmbientLight(0x404040, 1); // Soft white light
+  scene.add(ambientLight);
+
+  // Background
+  //scene.background = new Color(0xeeeeee); // Light gray background
+}
+
+setupLights();
 
 // Create input component
 world.createEntity().addComponent(InputStateComponent, {
@@ -40,11 +64,14 @@ world.createEntity().addComponent(InputStateComponent, {
   pressedKeys: {}
 });
 
+let mixer = null; // Declare mixer globally
+
 // Async function to load map and champion
 async function loadAssets() {
   try {
-    const map = await loadMap();
-    await loadChampion(map);
+    await loadMap(); // Load the map and navmesh first
+    const { navmesh } = await loadNavmesh(); // Load the map and navmesh first
+    await loadChampion(navmesh); // Load the champion using navmesh
   } catch (error) {
     console.error('Error loading assets:', error);
   }
@@ -54,17 +81,12 @@ async function loadMap() {
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.load(
-      '/assets/models/scaled_down.glb',
+      '/assets/models/levels/map4/level.glb',
       (gltf) => {
         console.log('GLB file loaded:', gltf);
         const object = gltf.scene;
-
-        // Calculate the bounding box and adjust position
         const box = new Box3().setFromObject(object);
         const size = box.getSize(new Vector3());
-
-        // Check if the bounding box size is correct
-        console.log('Bounding Box Size:', size);
 
         world.createEntity().addComponent(MapComponent, {
           width: size.x,
@@ -84,54 +106,19 @@ async function loadMap() {
           height: minimapCanvas.height
         });
 
-        const center = box.getCenter(new Vector3());
-
-        // Check if centering is correct
-        console.log('Bounding Box Center:', center);
-
-        object.position.sub(center); // Move the object to center
-
-        // Disable depth test for all materials in the object
         object.traverse((child) => {
-          if (child.isMesh) {
-            if (child.material.transparent) {
-              child.renderOrder = 1;
-            }
+          if (child.isMesh && child.material.transparent) {
+            child.renderOrder = 1;
           }
         });
 
         scene.add(object);
 
-        // Add some simple lighting (notrequired for MeshBasicMaterial since it doesn't affect it)
-        //const ambientLight = new AmbientLight('white'); // light gray ambient light
-        //ambientLight.position.set(69.36, 25, -4.18);
-        //scene.add(ambientLight);
-
-        // White directional light at half intensity shining from the top.
-
-        // LIGHT 1
-
-        //const lightStrength = 20;
-        //const light0 = new DirectionalLight('#5AA3A8', lightStrength + 5);
-        //light0.position.set(0, 55, 0); // Adjust the position as needed
-        //scene.add(light0);
-
-        // LIGHT 2
-        //const light1 = new DirectionalLight('#529B80', lightStrength + 10);
-        //light1.position.set(80, 55, 25); // Adjust the position as needed
-        //scene.add(light1);
-
-        // // LIGHT 3
-
-        // Light 4
-        // Z up and down
-        // Y depth
-        // @TODO
+        // Shop Light
         const shopLight = new PointLight('#534934', 2500, 3.24, 2.32);
         shopLight.position.set(72, 5, 2.5); // Adjust the position as needed
         scene.add(shopLight);
-
-        resolve(object);
+        resolve({ object });
       },
       undefined, // onProgress
       (error) => {
@@ -142,29 +129,81 @@ async function loadMap() {
   });
 }
 
-function setupLights() {
-  scene.add(directionalLight0);
-  scene.add(directionalLight1);
-  scene.add(directionalLight2);
+async function loadNavmesh() {
+  const loader = new GLTFLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(
+      '/assets/models/levels/map4/navmesh_test.glb',
+      (gltf) => {
+        console.log('GLB file loaded:', gltf);
+        const object = gltf.scene;
+        let navmesh = null;
+        gltf.scene.traverse((child) => {
+          if (child.isMesh && child.name === 'NavMesh') {
+            child.material.transparent = false;
+            child.material.opacity = 1;
+            child.material.visible = false;
+            child.material.color.set(0xff0000); // Set to red for visibility
+            navmesh = child; // Assign the navmesh
+          }
+        });
+        if (!navmesh) {
+          console.warn('NavMesh not found in the loaded map.');
+        }
+
+        scene.add(object);
+        if (navmesh) {
+          // Initialize Pathfinding
+          const pathfinder = new Pathfinding();
+          const pathfinderHelper = new PathfindingHelper();
+          scene.add(pathfinderHelper);
+          try {
+            navmesh.updateMatrixWorld(); // Ensure matrixWorld is up to date
+            const transformedGeometry = navmesh.geometry.clone();
+            transformedGeometry.applyMatrix4(navmesh.matrixWorld); // Apply transform HERE
+
+            pathfinder.setZoneData('level4', Pathfinding.createZone(transformedGeometry));
+
+            // Add PathfindingComponent to the world
+            world.createEntity().addComponent(PathfindingComponent, {
+              pathfinder: pathfinder,
+              helper: pathfinderHelper,
+              zone: 'level4'
+            });
+          } catch (pfError) {
+            console.error('Error creating Pathfinding zone:', pfError);
+          }
+        }
+
+        resolve({ navmesh });
+      },
+      undefined, // onProgress
+      (error) => {
+        console.error('Error loading GLB file:', error);
+        reject(error);
+      }
+    );
+  });
 }
 
-setupLights();
+async function loadChampion(navmesh) {
+  if (!navmesh) {
+    console.error('Cannot load champion without NavMesh.');
+    return;
+  }
 
-let mixer = null; // Declare mixer globally
-
-async function loadChampion(map) {
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.load(
       '/assets/models/Tryndamere.gltf',
       (gltf) => {
         const character = gltf.scene;
-        setInitialPosition(character, map);
+        setInitialPosition(character, navmesh);
         scaleAndRotateCharacter(character);
         scene.add(character);
 
         mixer = new AnimationMixer(character);
-        const idleClip = gltf.animations[25];
+        const idleClip = gltf.animations.find((anim) => anim.name.toLowerCase().includes('idle'));
         if (idleClip) {
           const idleAction = mixer.clipAction(idleClip);
           idleAction.setLoop(LoopRepeat, Infinity);
@@ -186,16 +225,20 @@ async function loadChampion(map) {
   });
 }
 
-function setInitialPosition(character, map) {
-  const raycaster = new Raycaster(new Vector3(69.36, -1.22, -4.18), new Vector3(0, -1, 0));
-  const intersects = raycaster.intersectObject(map, true);
+function setInitialPosition(character, navmesh) {
+  const position = new Vector3(68.03615936878441, 1.7478288228577257, -9.705994355515998); // Starting position
+
+  // Cast a ray downward from the initial position
+  const raycaster = new Raycaster(position, new Vector3(0, -1, 0), 0, 100);
+  const intersects = raycaster.intersectObject(navmesh, true);
 
   if (intersects.length > 0) {
     const groundPoint = intersects[0].point;
-    character.position.set(groundPoint.x, groundPoint.y, groundPoint.z);
+    character.position.copy(groundPoint);
+    console.log('Character placed on NavMesh at:', groundPoint);
   } else {
-    console.warn('No ground intersection found. Setting default position.');
-    character.position.set(69.36, -1.22, -4.18);
+    console.warn('No intersection with NavMesh found. Setting default position.');
+    character.position.set(position.x, position.y, position.z);
   }
 }
 
