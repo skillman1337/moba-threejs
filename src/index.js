@@ -12,9 +12,6 @@ import {
   PointLight,
   AmbientLight,
   Raycaster,
-  Color,
-  SphereGeometry,
-  Mesh,
   Box3,
   Vector3,
   AnimationMixer,
@@ -60,7 +57,7 @@ setupLights();
 
 // Create input component
 world.createEntity().addComponent(InputStateComponent, {
-  cursorPosition: { x: 0, y: 0 },
+  cursorPosition: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
   pressedKeys: {}
 });
 
@@ -141,7 +138,7 @@ async function loadNavmesh() {
         gltf.scene.traverse((child) => {
           if (child.isMesh && child.name === 'NavMesh') {
             child.material.transparent = false;
-            child.material.opacity = 1;
+            child.material.opacity = 0.5;
             child.material.visible = false;
             child.material.color.set(0xff0000); // Set to red for visibility
             navmesh = child; // Assign the navmesh
@@ -226,11 +223,14 @@ async function loadChampion(navmesh) {
 }
 
 function setInitialPosition(character, navmesh) {
-  const position = new Vector3(68.03615936878441, 1.7478288228577257, -9.705994355515998); // Starting position
+  const position = new Vector3(68.04, 1.75, -9.71); // Starting position
+  // const position = new Vector3(55.15, 0.16, -20.78); // Starting position
+
+  const groundRaycaster = new Raycaster();
+  groundRaycaster.set(position.add(new Vector3(0, 10, 0)), new Vector3(0, -1, 0));
 
   // Cast a ray downward from the initial position
-  const raycaster = new Raycaster(position, new Vector3(0, -1, 0), 0, 100);
-  const intersects = raycaster.intersectObject(navmesh, true);
+  const intersects = groundRaycaster.intersectObject(navmesh, true);
 
   if (intersects.length > 0) {
     const groundPoint = intersects[0].point;
