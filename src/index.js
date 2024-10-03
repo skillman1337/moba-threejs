@@ -155,8 +155,8 @@ const loadNavmesh = () => {
         object.traverse((child) => {
           if (child.isMesh && child.name === 'NavMesh') {
             child.material.transparent = true;
-            child.material.opacity = 0.25;
-            child.material.visible = false;
+            child.material.opacity = 1;
+            child.visible = false;
             child.material.color.set(0xff0000); // Red color for visibility
             navmesh = child;
           }
@@ -179,6 +179,7 @@ const loadNavmesh = () => {
             pathfinder.setZoneData('level4', zone);
 
             const pathfinderHelper = new PathfindingHelper();
+            pathfinderHelper.visible = false;
             scene.add(pathfinderHelper);
 
             // Add PathfindingComponent to the world

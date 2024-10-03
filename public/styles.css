@@ -38,11 +38,11 @@ body {
   color: white;
   border: none;
   padding: 8px 12px;
-  margin-bottom: 10px; /* Adds space below the button */
+  margin-bottom: 10px;
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s;
-  width: 100%; /* Makes the button stretch to the width of the container */
+  width: 100%;
 }
 
 #debug-hud button:hover,
@@ -67,7 +67,8 @@ body {
 }
 
 #debug-hud input[type='color'],
-#debug-hud input[type='range'] {
+#debug-hud input[type='range'],
+#debug-hud input[type='checkbox'] {
   display: block;
   width: 100%;
   margin-bottom: 5px;
@@ -82,4 +83,16 @@ body {
   background-color: rgba(255, 255, 255, 0.1);
   padding: 5px;
   border-radius: 3px;
+}
+
+#debug-hud input[type='checkbox'] {
+  width: auto;
+  margin-right: 5px;
+  display: inline-block;
+}
+
+#debug-hud label {
+  display: inline-block;
+  font-size: 14px;
+  margin-bottom: 0;
 }
