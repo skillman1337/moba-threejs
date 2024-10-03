@@ -14,6 +14,11 @@ class CharacterControlSystem extends System {
     // Cache for performance
     this.pathfindingEntity = null;
     this.pathfindingComponent = null;
+
+    // Cache the map object for raycasting
+    this.map = null;
+
+    this.collisionCache = new Map(); // Caching collision results
   }
 
   execute(delta, time) {
@@ -22,7 +27,7 @@ class CharacterControlSystem extends System {
       this.eventListenersInitialized = true;
     }
 
-    // Cache the PathfindingComponent and navmesh
+    // Cache the PathfindingComponent
     if (!this.pathfindingComponent) {
       const pathfindingEntities = this.queries.pathfinding.results;
       if (pathfindingEntities.length > 0) {
@@ -71,7 +76,7 @@ class CharacterControlSystem extends System {
     const start = characterComponent.character.getWorldPosition(new Vector3());
     const startGroupID = pathfinder.getGroup(ZONE, start, true);
     const end = targetPoint.clone();
-    // const end = new Vector3(67.96783552101195, 2.27072360252781, -9.946485506017739);
+    // const end = new Vector3(61.19340904238641, 0.9117487956594338, -3.6700566108804225); // Example end point
 
     console.log('Start Point:', start);
     console.log('End  Point:', end);
@@ -95,12 +100,139 @@ class CharacterControlSystem extends System {
 
     if (finalPath && finalPath.length > 0) {
       console.log('Computed Path:', finalPath);
+
+      // Remove duplicate waypoints
+      finalPath = this.removeDuplicateWaypoints(finalPath);
+
+      // Cache the map if not already cached
+      if (!this.map) {
+        const scene = renderer.scene.getObject3D();
+        let foundMap = false;
+        scene.traverse((object) => {
+          if (!foundMap && object.name === 'room') {
+            this.map = object;
+            foundMap = true; // Stop further traversal
+          }
+        });
+        if (!this.map) {
+          console.warn('Map object named "room" not found for path smoothing.');
+        }
+      }
+
+      // Apply path smoothing
+      if (this.map) {
+        finalPath = this.smoothPath(start, finalPath, 3); // Look ahead up to 3 steps
+        console.log('Smoothed Path:', finalPath);
+      } else {
+        console.warn('Map not available. Skipping path smoothing.');
+      }
+
       pathfinderHelper.setPath(finalPath);
       characterComponent.waypointQueue = this.removeDuplicateWaypoints(finalPath);
       this.moveToNextWaypoint(characterComponent, renderer);
     } else {
       console.warn('Failed to find a valid path even after attempting to find the closest node.');
+      // What we need to do here, is to walk to the closest node center point first
     }
+  }
+
+  /**
+   * Smooths the given path by looking ahead up to maxLookAheadSteps and skipping intermediate waypoints if possible.
+   * @param {Vector3[]} path - The original path consisting of waypoints.
+   * @param {number} maxLookAheadSteps - The maximum number of steps to look ahead for smoothing.
+   * @returns {Vector3[]} - The smoothed path excluding the start point.
+   */
+  smoothPath(start, path, maxLookAheadSteps) {
+    if (!this.map) return path; // If map is not available, return the original path
+    if (!path || path.length === 0) return [];
+
+    const smoothedPath = [];
+    let currentIndex = 0;
+    const fullPath = [start, ...path];
+    const pathLength = fullPath.length;
+
+    while (currentIndex < pathLength - 1) {
+      const lookAheadLimit = Math.min(currentIndex + maxLookAheadSteps, pathLength - 1);
+      let nextIndex = currentIndex + 1;
+
+      for (let i = lookAheadLimit; i > currentIndex; i--) {
+        if (this.isPathClear(fullPath[currentIndex], fullPath[i])) {
+          nextIndex = i;
+          break;
+        }
+      }
+
+      // Prevent infinite loop in case no progress is made
+      if (nextIndex === currentIndex) {
+        console.warn(
+          'Cannot move forward from the current index. Possible obstacle blocking the path.'
+        );
+        break;
+      }
+
+      smoothedPath.push(fullPath[nextIndex]);
+      currentIndex = nextIndex;
+    }
+
+    // Ensure the final waypoint is included
+    const lastWaypoint = fullPath[pathLength - 1];
+    const lastInSmoothed = smoothedPath[smoothedPath.length - 1];
+
+    if (!lastInSmoothed || !lastInSmoothed.equals(lastWaypoint)) {
+      smoothedPath.push(lastWaypoint);
+      // Consider logging this event only in debug mode
+      // console.log('Final waypoint added to smoothedPath.');
+    }
+
+    return smoothedPath;
+  }
+
+  /**
+   * Checks if the path between two points is clear of obstacles.
+   * Utilizes caching to avoid redundant collision checks.
+   * @param {Vector3} start - The starting point.
+   * @param {Vector3} end - The ending point.
+   * @returns {boolean} - True if the path is clear, false otherwise.
+   */
+  isPathClear(start, end) {
+    const raycaster = new Raycaster();
+
+    const cacheKey = `${start.x},${start.y},${start.z}-${end.x},${end.y},${end.z}`;
+    if (this.collisionCache.has(cacheKey)) {
+      return this.collisionCache.get(cacheKey);
+    }
+
+    const direction = new Vector3().subVectors(end, start);
+    const distance = direction.length();
+
+    if (distance === 0) {
+      this.collisionCache.set(cacheKey, true);
+      return true;
+    }
+
+    direction.normalize();
+
+    const yBuffer = 0.2;
+    const origin = new Vector3(start.x, start.y + yBuffer, start.z);
+
+    raycaster.set(origin, direction);
+    raycaster.far = distance - 0.1;
+    raycaster.near = 0.1;
+
+    // Optimize: Specify objects to check against if possible
+    const intersects = raycaster.intersectObject(this.map, true);
+
+    const isClear = intersects.length === 0;
+    this.collisionCache.set(cacheKey, isClear);
+
+    return isClear;
+  }
+
+  /**
+   * Clears the collision cache. Call this if the map changes.
+   */
+  clearCollisionCache() {
+    this.collisionCache.clear();
   }
 
   moveToNextWaypoint(characterComponent, renderer) {
@@ -138,7 +270,7 @@ class CharacterControlSystem extends System {
     }
 
     characterComponent.positionTween = new TWEEN.Tween(character.position)
-      .to(targetPoint, duration)
+      .to({ x: targetPoint.x, y: targetPoint.y, z: targetPoint.z }, duration)
       .easing(TWEEN.Easing.Linear.None)
       .onUpdate(() => {
         // Update running animation only if not already running
@@ -150,7 +282,10 @@ class CharacterControlSystem extends System {
         }
       })
       .onComplete(() => {
-        this.playIdleAnimation(characterComponent);
+        // Only play idle animation if there are no more waypoints
+        if (characterComponent.waypointQueue.length === 0) {
+          this.playIdleAnimation(characterComponent);
+        }
         if (onComplete) onComplete();
       })
       .start();
@@ -186,17 +321,21 @@ class CharacterControlSystem extends System {
     let map = null;
     let foundMap = false;
     scene.traverse((object) => {
-      if (!foundMap && object.name == 'room') {
+      if (!foundMap && object.name === 'room') {
         map = object;
         foundMap = true; // Set the flag to stop further processing
       }
     });
+    if (map && !this.map) {
+      this.map = map; // Cache the map for future use
+    }
     if (!map) {
       console.warn('map not found');
-    }
-    const intersects = raycaster.intersectObject(map, true);
-    if (intersects.length > 0) {
-      return intersects[0].point;
+    } else {
+      const intersects = raycaster.intersectObject(map, true);
+      if (intersects.length > 0) {
+        return intersects[0].point;
+      }
     }
     return null;
   }
@@ -210,7 +349,7 @@ class CharacterControlSystem extends System {
 
         if (
           characterComponent.currentAction &&
-          characterComponent.currentAction.getClip().name != 'tryndamere_run.anm'
+          characterComponent.currentAction.getClip().name !== 'tryndamere_run.anm'
         ) {
           characterComponent.currentAction.fadeOut(0.5); // Smooth transition to running
         }
@@ -244,6 +383,7 @@ class CharacterControlSystem extends System {
   }
 }
 
+// Define the queries for the system
 CharacterControlSystem.queries = {
   renderer: { components: [WebGLRendererComponent] },
   input: { components: [InputStateComponent] },

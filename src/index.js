@@ -28,10 +28,8 @@ import { CharacterSoundComponent } from './components/CharacterSoundComponent.js
 import { Pathfinding, PathfindingHelper } from 'three-pathfinding';
 import { PathfindingComponent } from './components/PathfindingComponent.js';
 
-// Create the ECSY world
+// Initialize the ECSY world and register components and systems
 const world = new ECSYThreeWorld();
-
-// Register components and systems
 registerComponentsAndSystems(world);
 
 // Setup renderer, scene, and camera
@@ -39,57 +37,53 @@ const { scene, sceneEntity } = setupScene(world);
 const { cameraEntity } = setupCamera(world, sceneEntity);
 setupRenderer(world, sceneEntity, cameraEntity);
 
-// Setup lights
-function setupLights() {
-  scene.add(directionalLight0);
-  scene.add(directionalLight1);
-  scene.add(directionalLight2);
+// Function to setup lights in the scene
+const setupLights = () => {
+  [directionalLight0, directionalLight1, directionalLight2].forEach((light) => scene.add(light));
 
-  // Add ambient light
   const ambientLight = new AmbientLight(0x404040, 1); // Soft white light
   scene.add(ambientLight);
-
-  // Background
-  //scene.background = new Color(0xeeeeee); // Light gray background
-}
+};
 
 setupLights();
 
-// Create input component
+// Create and add the InputStateComponent to the world
 world.createEntity().addComponent(InputStateComponent, {
   cursorPosition: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
   pressedKeys: {}
 });
 
-let mixer = null; // Declare mixer globally
+let mixer = null; // Global mixer for animations
 
-// Async function to load map and champion
-async function loadAssets() {
+// Async function to load all necessary assets
+const loadAssets = async () => {
   try {
-    await loadMap(); // Load the map and navmesh first
-    const { navmesh } = await loadNavmesh(); // Load the map and navmesh first
-    await loadChampion(navmesh); // Load the champion using navmesh
+    const { map } = await loadMap();
+    await loadNavmesh();
+    await loadChampion(map);
   } catch (error) {
     console.error('Error loading assets:', error);
   }
-}
+};
 
-async function loadMap() {
+// Function to load the map and the nexus
+const loadMap = () => {
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.load(
       '/assets/models/levels/map4/level.glb',
       (gltf) => {
-        console.log('GLB file loaded:', gltf);
         const object = gltf.scene;
         const box = new Box3().setFromObject(object);
         const size = box.getSize(new Vector3());
 
+        // Add MapComponent to the world
         world.createEntity().addComponent(MapComponent, {
           width: size.x,
           height: size.z
         });
 
+        // Setup minimap
         const minimapCanvas = document.getElementById('minimap');
         const minimapContainer = document.getElementById('minimap-container');
 
@@ -103,7 +97,10 @@ async function loadMap() {
           height: minimapCanvas.height
         });
 
+        // Traverse the loaded object to find specific parts
+        let map = null;
         object.traverse((child) => {
+          if (child.name === 'room') map = child;
           if (child.isMesh && child.material.transparent) {
             child.renderOrder = 1;
           }
@@ -111,59 +108,82 @@ async function loadMap() {
 
         scene.add(object);
 
-        // Shop Light
-        const shopLight = new PointLight('#534934', 2500, 3.24, 2.32);
-        shopLight.position.set(72, 5, 2.5); // Adjust the position as needed
+        // Add Shop Light
+        const shopLight = new PointLight(0x534934, 2500, 3.24, 2.32);
+        shopLight.position.set(72, 5, 2.5);
         scene.add(shopLight);
-        resolve({ object });
+
+        // Load the Nexus model
+        loader.load(
+          '/assets/models/levels/map4/nexus.glb',
+          (nexusGltf) => {
+            const nexus = nexusGltf.scene;
+            nexus.position.set(46.236657393511635, -0.315436910304709, -10.32942817890707);
+            nexus.scale.set(0.01, 0.01, 0.01);
+            nexus.rotation.y = -0.75;
+            nexus.name = 'Nexus';
+            scene.add(nexus);
+            console.log('Nexus loaded successfully.');
+            resolve({ map });
+          },
+          undefined,
+          (error) => {
+            console.error('Error loading Nexus GLB file:', error);
+            reject(error);
+          }
+        );
       },
-      undefined, // onProgress
+      undefined,
       (error) => {
-        console.error('Error loading GLB file:', error);
+        console.error('Error loading map GLB file:', error);
         reject(error);
       }
     );
   });
-}
+};
 
-async function loadNavmesh() {
+// Function to load the navigation mesh
+const loadNavmesh = () => {
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.load(
-      '/assets/models/levels/map4/navmesh_test.glb',
+      '/assets/models/levels/map4/navmesh.glb',
       (gltf) => {
-        console.log('GLB file loaded:', gltf);
         const object = gltf.scene;
         let navmesh = null;
-        gltf.scene.traverse((child) => {
+
+        object.traverse((child) => {
           if (child.isMesh && child.name === 'NavMesh') {
-            child.material.transparent = false;
-            child.material.opacity = 0.5;
+            child.material.transparent = true;
+            child.material.opacity = 0.25;
             child.material.visible = false;
-            child.material.color.set(0xff0000); // Set to red for visibility
-            navmesh = child; // Assign the navmesh
+            child.material.color.set(0xff0000); // Red color for visibility
+            navmesh = child;
           }
         });
+
         if (!navmesh) {
           console.warn('NavMesh not found in the loaded map.');
         }
 
         scene.add(object);
-        if (navmesh) {
-          // Initialize Pathfinding
-          const pathfinder = new Pathfinding();
-          const pathfinderHelper = new PathfindingHelper();
-          scene.add(pathfinderHelper);
-          try {
-            navmesh.updateMatrixWorld(); // Ensure matrixWorld is up to date
-            const transformedGeometry = navmesh.geometry.clone();
-            transformedGeometry.applyMatrix4(navmesh.matrixWorld); // Apply transform HERE
 
-            pathfinder.setZoneData('level4', Pathfinding.createZone(transformedGeometry));
+        if (navmesh) {
+          try {
+            navmesh.updateMatrixWorld(); // Ensure the world matrix is up to date
+            const transformedGeometry = navmesh.geometry.clone();
+            transformedGeometry.applyMatrix4(navmesh.matrixWorld); // Apply world transformations
+
+            const pathfinder = new Pathfinding();
+            const zone = Pathfinding.createZone(transformedGeometry);
+            pathfinder.setZoneData('level4', zone);
+
+            const pathfinderHelper = new PathfindingHelper();
+            scene.add(pathfinderHelper);
 
             // Add PathfindingComponent to the world
             world.createEntity().addComponent(PathfindingComponent, {
-              pathfinder: pathfinder,
+              pathfinder,
               helper: pathfinderHelper,
               zone: 'level4'
             });
@@ -172,91 +192,92 @@ async function loadNavmesh() {
           }
         }
 
-        resolve({ navmesh });
+        resolve();
       },
-      undefined, // onProgress
+      undefined,
       (error) => {
-        console.error('Error loading GLB file:', error);
+        console.error('Error loading Navmesh GLB file:', error);
         reject(error);
       }
     );
   });
-}
+};
 
-async function loadChampion(navmesh) {
-  if (!navmesh) {
-    console.error('Cannot load champion without NavMesh.');
-    return;
+// Function to load the champion character
+const loadChampion = (map) => {
+  if (!map) {
+    console.error('Cannot load champion without a valid map.');
+    return Promise.resolve(); // Continue execution even if the map isn't loaded
   }
 
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.load(
-      '/assets/models/Tryndamere.gltf',
+      '/assets/models/champions/Tryndamere.gltf',
       (gltf) => {
         const character = gltf.scene;
-        setInitialPosition(character, navmesh);
+        setInitialPosition(character, map);
         scaleAndRotateCharacter(character);
         scene.add(character);
 
         mixer = new AnimationMixer(character);
         const idleClip = gltf.animations.find((anim) => anim.name.toLowerCase().includes('idle'));
+
         if (idleClip) {
           const idleAction = mixer.clipAction(idleClip);
           idleAction.setLoop(LoopRepeat, Infinity);
           idleAction.play();
 
           createCharacterEntity(character, gltf.animations, mixer, idleAction);
-          resolve(gltf);
         } else {
-          console.warn('Idle animation not found.');
-          resolve(gltf); // Resolve even if no idle animation to avoid hanging
+          console.warn('Idle animation not found for the character.');
         }
+
+        resolve();
       },
-      undefined, // onProgress
+      undefined,
       (error) => {
-        console.error('Error loading GLTF file:', error);
+        console.error('Error loading champion GLTF file:', error);
         reject(error);
       }
     );
   });
-}
+};
 
-function setInitialPosition(character, navmesh) {
-  const position = new Vector3(68.04, 1.75, -9.71); // Starting position
-  // const position = new Vector3(55.15, 0.16, -20.78); // Starting position
+// Helper function to set the initial position of the character
+const setInitialPosition = (character, map) => {
+  const initialPosition = new Vector3(68.04, 1.75, -9.71);
+  const raycaster = new Raycaster(initialPosition, new Vector3(0, -1, 0));
 
-  const groundRaycaster = new Raycaster();
-  groundRaycaster.set(position.add(new Vector3(0, 10, 0)), new Vector3(0, -1, 0));
-
-  // Cast a ray downward from the initial position
-  const intersects = groundRaycaster.intersectObject(navmesh, true);
+  // Cast a ray downward from the initial position to place the character on the ground
+  const intersects = raycaster.intersectObject(map, true);
 
   if (intersects.length > 0) {
-    const groundPoint = intersects[0].point;
-    character.position.copy(groundPoint);
-    console.log('Character placed on NavMesh at:', groundPoint);
+    character.position.copy(intersects[0].point);
+    console.log('Character positioned on the map at:', intersects[0].point);
   } else {
-    console.warn('No intersection with NavMesh found. Setting default position.');
-    character.position.set(position.x, position.y, position.z);
+    console.warn('No intersection with map found. Using default position.');
+    character.position.copy(initialPosition);
   }
-}
+};
 
-function scaleAndRotateCharacter(character) {
+// Helper function to scale and rotate the character appropriately
+const scaleAndRotateCharacter = (character) => {
   character.scale.set(0.02, 0.02, 0.02);
   character.rotation.y = -0.75;
-}
+};
 
-function createCharacterEntity(character, animations, mixer, idleAction) {
+// Function to create and add the character entity with necessary components
+const createCharacterEntity = (character, animations, mixer, idleAction) => {
   world
     .createEntity()
     .addComponent(CharacterComponent, {
-      character: character,
-      position: character.position,
-      rotation: character.rotation,
+      character,
+      position: character.position.clone(),
+      rotation: character.rotation.clone(),
       movementSpeed: 3,
-      animations: animations,
-      mixer: mixer,
+      animations,
+      mixer,
       currentAction: idleAction
     })
     .addComponent(CharacterSoundComponent, {
@@ -268,19 +289,25 @@ function createCharacterEntity(character, animations, mixer, idleAction) {
         '/assets/sound/VOBank_en_US/6072_TryndamereSultan.move5.wav'
       ]
     });
-}
+};
 
+// Initiate the asset loading process
 loadAssets();
 
+// Initialize the clock for animation timing
 const clock = new Clock();
-// Update the animation loop to call requestAnimationFrame
+
+// Define and start the animation loop
 const animationLoop = () => {
   requestAnimationFrame(animationLoop);
   const delta = clock.getDelta();
+
   if (mixer) {
-    mixer.update(delta); // Ensure delta is used correctly
+    mixer.update(delta); // Update character animations
   }
-  TWEEN.update(); // Ensure tweens are updated
-  world.execute(delta, clock.elapsedTime);
+
+  TWEEN.update(); // Update Tween animations
+  world.execute(delta, clock.elapsedTime); // Execute ECSY systems
 };
+
 animationLoop();
