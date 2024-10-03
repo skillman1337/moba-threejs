@@ -27,6 +27,7 @@ import { CharacterComponent } from './components/CharacterComponent.js';
 import { CharacterSoundComponent } from './components/CharacterSoundComponent.js';
 import { Pathfinding, PathfindingHelper } from 'three-pathfinding';
 import { PathfindingComponent } from './components/PathfindingComponent.js';
+import { SoundComponent } from './components/SoundComponent.js';
 
 // Initialize the ECSY world and register components and systems
 const world = new ECSYThreeWorld();
@@ -51,6 +52,12 @@ setupLights();
 world.createEntity().addComponent(InputStateComponent, {
   cursorPosition: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
   pressedKeys: {}
+});
+
+const storedVolume = localStorage.getItem('volume');
+
+world.createEntity().addComponent(SoundComponent, {
+  volume: storedVolume !== null ? parseFloat(storedVolume) : 1
 });
 
 let mixer = null; // Global mixer for animations
@@ -274,8 +281,6 @@ const createCharacterEntity = (character, animations, mixer, idleAction) => {
     .createEntity()
     .addComponent(CharacterComponent, {
       character,
-      position: character.position.clone(),
-      rotation: character.rotation.clone(),
       movementSpeed: 3,
       animations,
       mixer,

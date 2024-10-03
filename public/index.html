@@ -10,14 +10,6 @@
     <div id="debug-hud">
       <div id="character-info"></div>
       <button id="toggle-light-controls">Toggle Light Controls</button>
-      <div>
-        <input type="checkbox" id="show-navmesh" />
-        <label for="show-navmesh">Show navmesh</label>
-      </div>
-      <div>
-        <input type="checkbox" id="debug-pathfinding" />
-        <label for="debug-pathfinding">Debug pathfinding</label>
-      </div>
       <div id="light-controls" style="display: none">
         <div>
           <label for="light0-color">Light 0 Color:</label>
@@ -43,6 +35,18 @@
         <select id="tone-mapping-selector"></select>
         <label for="tone-mapping-exposure">Tone Mapping Exposure:</label>
         <input type="range" id="tone-mapping-exposure" min="1" max="10" step="0.1" value="1" />
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="show-navmesh" />
+        <label for="show-navmesh">Show navmesh</label>
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="debug-pathfinding" />
+        <label for="debug-pathfinding">Debug pathfinding</label>
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="disable-sound" />
+        <label for="disable-sound">Disable sound</label>
       </div>
     </div>
     <div id="minimap-container">

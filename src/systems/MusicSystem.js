@@ -1,6 +1,7 @@
 import { System } from 'ecsy';
 import { AudioLoader, AudioListener, Audio } from 'three';
 import { WebGLRendererComponent } from '../../lib/ecs/components/WebGLRendererComponent';
+import { SoundComponent } from '../components/SoundComponent';
 
 class MusicSystem extends System {
   init() {
@@ -16,6 +17,7 @@ class MusicSystem extends System {
     this.mainTrackBuffers = []; // To store preloaded AudioBuffers
     this.ambientTrackBuffer = null;
     this.currentMainAudio = null;
+    this.soundComponent = null;
 
     this.ambientTrackInstance = null;
     this.isAmbientTrackPlaying = false;
@@ -34,6 +36,29 @@ class MusicSystem extends System {
 
     // Preload all main tracks and ambient track
     this.preloadTracks();
+  }
+
+  execute(delta, time) {
+    // Check if the source is available and assign the onended handler if pending
+    if (this.pendingMainTrackEnded && this.currentMainAudio.source) {
+      this.currentMainAudio.source.onended = this.onMainTrackEnded.bind(this);
+      this.pendingMainTrackEnded = false;
+    }
+
+    if (!this.soundComponent) {
+      const soundEntities = this.queries.sound.results;
+      if (soundEntities.length > 0) {
+        this.soundComponent = soundEntities[0].getComponent(SoundComponent);
+      }
+    }
+
+    if (this.currentMainAudio && this.soundComponent) {
+      this.currentMainAudio.setVolume(this.soundComponent.volume);
+    }
+
+    if (this.ambientTrackInstance && this.soundComponent) {
+      this.ambientTrackInstance.setVolume(this.soundComponent.volume);
+    }
   }
 
   preloadTracks() {
@@ -168,18 +193,11 @@ class MusicSystem extends System {
     // console.log(`Playing track ${this.currentTrackIndex + 1}.`);
     this.playMainTrack(this.currentTrackIndex);
   }
-
-  execute(delta, time) {
-    // Check if the source is available and assign the onended handler if pending
-    if (this.pendingMainTrackEnded && this.currentMainAudio.source) {
-      this.currentMainAudio.source.onended = this.onMainTrackEnded.bind(this);
-      this.pendingMainTrackEnded = false;
-    }
-  }
 }
 
 MusicSystem.queries = {
-  renderer: { components: [WebGLRendererComponent] }
+  renderer: { components: [WebGLRendererComponent] },
+  sound: { components: [SoundComponent] }
 };
 
 export { MusicSystem };

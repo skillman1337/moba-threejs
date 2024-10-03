@@ -13,8 +13,9 @@ import {
   NeutralToneMapping
 } from 'three';
 import { WebGLRendererComponent } from '../../lib/ecs/components/WebGLRendererComponent.js';
-import { PathfindingComponent } from '../components/PathfindingComponent.js'; // Ensure this exists
+import { PathfindingComponent } from '../components/PathfindingComponent.js';
 import { toneMapping, toneMappingExposure } from '../config/renderConfig.js';
+import { SoundComponent } from '../components/SoundComponent.js';
 
 const toneMappingTypes = [
   { name: 'No Tone Mapping', value: NoToneMapping },
@@ -34,36 +35,40 @@ class DebugHudSystem extends System {
     this.setupToggleLightControls();
     this.setupNavmeshControl();
     this.setupPathfindingDebugControl();
+    this.setupDisableSoundControl();
 
     this.pathfindingComponent = null;
-    this.pathfindingEntity = null;
-
+    this.soundComponent = null;
     this.rendererComponent = null;
   }
 
-  execute(delta, time) {
+  execute() {
     this.queries.characters.results.forEach((entity) => {
-      const characterPosition = entity.getComponent(CharacterComponent).position;
+      const characterPosition = entity.getComponent(CharacterComponent).character.position;
       const characterInfo = document.getElementById('character-info');
       characterInfo.innerHTML = `Character Position: x: ${characterPosition.x.toFixed(
         2
       )}, y: ${characterPosition.y.toFixed(2)}, z: ${characterPosition.z.toFixed(2)}`;
     });
 
-    // Cache the PathfindingComponent
     if (!this.pathfindingComponent) {
-      const pathfindingEntities = this.queries.pathfinding.results;
-      if (pathfindingEntities.length > 0) {
-        this.pathfindingEntity = pathfindingEntities[0];
-        this.pathfindingComponent =
-          this.pathfindingEntity.getMutableComponent(PathfindingComponent);
+      const results = this.queries.pathfinding.results;
+      if (results.length > 0) {
+        this.pathfindingComponent = results[0].getMutableComponent(PathfindingComponent);
       }
     }
 
     if (!this.rendererComponent) {
-      const rendererQuery = this.queries.renderer.results;
-      if (rendererQuery.length > 0) {
-        this.rendererComponent = rendererQuery[0].getMutableComponent(WebGLRendererComponent);
+      const results = this.queries.renderer.results;
+      if (results.length > 0) {
+        this.rendererComponent = results[0].getMutableComponent(WebGLRendererComponent);
+      }
+    }
+
+    if (!this.soundComponent) {
+      const results = this.queries.sound.results;
+      if (results.length > 0) {
+        this.soundComponent = results[0].getMutableComponent(SoundComponent);
       }
     }
   }
@@ -124,14 +129,14 @@ class DebugHudSystem extends System {
     if (selectedToneMapping) {
       rendererComponent.renderer.toneMapping = selectedToneMapping.value;
     } else {
-      console.warn('Selected tone mapping type not found. Using default.');
+      console.warn('DebugHudSystem: Selected tone mapping type not found. Using default.');
       rendererComponent.renderer.toneMapping = NoToneMapping;
     }
 
     rendererComponent.renderer.toneMappingExposure = parseFloat(exposureSlider.value);
 
     console.log(
-      'Tone mapping changed to',
+      'DebugHudSystem: Tone mapping changed to',
       toneMappingSelector.value,
       'with exposure',
       exposureSlider.value
@@ -176,23 +181,22 @@ class DebugHudSystem extends System {
     const navmesh = scene.getObjectByName('NavMesh');
 
     if (!navmesh) {
-      console.warn('NavMesh object not found in the scene.');
+      console.warn('DebugHudSystem: NavMesh object not found in the scene.');
       return;
     }
 
     const map = scene.getObjectByName('room');
 
     if (!map) {
-      console.warn('map object not found in the scene.');
+      console.warn('DebugHudSystem: map object not found in the scene.');
       return;
     }
 
     const showNavmeshCheckbox = document.getElementById('show-navmesh');
     navmesh.visible = showNavmeshCheckbox.checked;
-    console.log(navmesh);
     map.visible = !showNavmeshCheckbox.checked;
 
-    console.log(`NavMesh visibility set to ${navmesh.visible}`);
+    console.log(`DebugHudSystem: NavMesh visibility set to ${navmesh.visible}`);
   }
 
   setupPathfindingDebugControl() {
@@ -200,12 +204,33 @@ class DebugHudSystem extends System {
     debugPathfindingCheckbox.addEventListener('change', () => this.updatePathfindingDebugControl());
   }
 
+  setupDisableSoundControl() {
+    const disableSoundCheckbox = document.getElementById('disable-sound');
+    const storedVolume = localStorage.getItem('volume');
+    if (storedVolume == '1') {
+      disableSoundCheckbox.checked = false;
+    } else {
+      disableSoundCheckbox.checked = true;
+    }
+    disableSoundCheckbox.addEventListener('change', () => this.updateDisableSoundControl());
+  }
+
+  updateDisableSoundControl() {
+    const disableSoundCheckbox = document.getElementById('disable-sound');
+    const isDisabled = disableSoundCheckbox.checked;
+    console.log(this.soundComponent);
+    this.soundComponent.volume = isDisabled ? 0 : 1;
+    localStorage.setItem('volume', this.soundComponent.volume);
+
+    console.log(`DebugHudSystem: Disable sound set to ${isDisabled}`);
+  }
+
   updatePathfindingDebugControl() {
     const debugPathfindingCheckbox = document.getElementById('debug-pathfinding');
     const pathfindingComponent = this.pathfindingComponent;
 
     if (!pathfindingComponent) {
-      console.warn('PathfindingComponent is missing.');
+      console.warn('DebugHudSystem: PathfindingComponent is missing.');
       return;
     }
 
@@ -216,7 +241,7 @@ class DebugHudSystem extends System {
       pathfindingComponent.helper.visible = debug;
     }
 
-    console.log(`Pathfinding debug helper visibility set to ${debug}`);
+    console.log(`DebugHudSystem: Pathfinding debug helper visibility set to ${debug}`);
   }
 
   toggleElementVisibility(element) {
@@ -227,7 +252,8 @@ class DebugHudSystem extends System {
 DebugHudSystem.queries = {
   characters: { components: [CharacterComponent] },
   renderer: { components: [WebGLRendererComponent] },
-  pathfinding: { components: [PathfindingComponent] }
+  pathfinding: { components: [PathfindingComponent] },
+  sound: { components: [SoundComponent] }
 };
 
 export { DebugHudSystem };

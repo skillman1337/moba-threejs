@@ -3,17 +3,31 @@ import { CharacterSoundComponent } from '../components/CharacterSoundComponent.j
 import { WebGLRendererComponent } from '../../lib/ecs/components/WebGLRendererComponent.js';
 import { CharacterComponent } from '../components/CharacterComponent.js';
 import { AudioLoader, AudioListener, Audio } from 'three';
+import { SoundComponent } from '../components/SoundComponent.js';
 
 class CharacterSoundSystem extends System {
   init() {
     this.handleRightClick = this.handleRightClick.bind(this);
     this.eventListenersInitialized = false;
+    this.soundComponent = null;
+    this.currentSound = null;
   }
 
   execute(delta, time) {
     if (!this.eventListenersInitialized) {
       document.addEventListener('contextmenu', this.handleRightClick);
       this.eventListenersInitialized = true;
+    }
+
+    if (!this.soundComponent) {
+      const soundEntities = this.queries.sound.results;
+      if (soundEntities.length > 0) {
+        this.soundComponent = soundEntities[0].getComponent(SoundComponent);
+      }
+    }
+
+    if (this.currentSound && this.soundComponent) {
+      this.currentSound.setVolume(this.soundComponent.volume);
     }
   }
 
@@ -42,14 +56,14 @@ class CharacterSoundSystem extends System {
   playSound(entity, soundFile) {
     const audioLoader = new AudioLoader();
     const listener = new AudioListener();
-    const sound = new Audio(listener);
+    this.currentSound = new Audio(listener);
 
     // Load the sound and play it
-    audioLoader.load(soundFile, function (buffer) {
-      sound.setBuffer(buffer);
-      sound.setLoop(false);
-      sound.setVolume(1.0);
-      sound.play();
+    audioLoader.load(soundFile, (buffer) => {
+      this.currentSound.setBuffer(buffer);
+      this.currentSound.setLoop(false);
+      this.currentSound.setVolume(1);
+      this.currentSound.play();
     });
 
     // Attach listener to the camera
@@ -62,14 +76,15 @@ class CharacterSoundSystem extends System {
     // Optionally, attach sound to character position to simulate 3D sound
     const characterComponent = entity.getComponent(CharacterComponent);
     if (characterComponent && characterComponent.character) {
-      characterComponent.character.add(sound);
+      characterComponent.character.add(this.currentSound);
     }
   }
 }
 
 CharacterSoundSystem.queries = {
   character: { components: [CharacterSoundComponent] },
-  renderer: { components: [WebGLRendererComponent] }
+  renderer: { components: [WebGLRendererComponent] },
+  sound: { components: [SoundComponent] }
 };
 
 export { CharacterSoundSystem };

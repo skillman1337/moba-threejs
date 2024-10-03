@@ -280,6 +280,7 @@ class CharacterControlSystem extends System {
         ) {
           this.playRunningAnimation(characterComponent);
         }
+        characterComponent.character.position.copy(character.position);
       })
       .onComplete(() => {
         // Only play idle animation if there are no more waypoints

@@ -1,8 +1,11 @@
+/* Reset and Basic Styling */
 body {
   margin: 0;
   overflow: hidden;
+  font-family: 'FangSong', serif; /* Added fallback serif font */
 }
 
+/* Minimap Styling */
 #minimap-container {
   position: absolute;
   bottom: 10px;
@@ -10,6 +13,8 @@ body {
   width: 200px;
   height: 200px;
   border: 2px solid #000;
+  border-radius: 5px; /* Optional: rounded corners */
+  overflow: hidden; /* Ensure canvas doesn't overflow */
 }
 
 #minimap {
@@ -18,60 +23,72 @@ body {
   height: 100%;
 }
 
+/* Debug HUD Styling */
 #debug-hud {
   position: fixed;
   top: 15px;
   left: 15px;
   z-index: 55;
   color: white;
-  font-family: fangsong;
+  font-family: 'FangSong', serif; /* Ensure consistency */
   width: auto;
   max-width: 90%;
   transition: opacity 0.3s ease-in-out;
-  padding: 10px;
-  border-radius: 5px;
-  background-color: rgba(0, 0, 0, 0.8);
+  padding: 15px; /* Increased padding for better spacing */
+  border-radius: 8px; /* Smoother corners */
+  background-color: rgba(0, 0, 0, 0.85); /* Slightly darker background */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); /* Added shadow for depth */
 }
 
 #debug-hud button {
   background-color: #091b29;
   color: white;
   border: none;
-  padding: 8px 12px;
-  margin-bottom: 10px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
   border-radius: 5px;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: background-color 0.3s, transform 0.2s;
   width: 100%;
+  font-size: 14px;
 }
 
 #debug-hud button:hover,
 #debug-hud button:focus {
   background-color: #1c777e;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
 }
 
 #debug-hud #character-info,
-#debug-hud #light-controls {
+#debug-hud #light-controls,
+#debug-hud #tone-mapping-controls {
   margin-bottom: 20px;
 }
 
-#debug-hud div {
-  margin-bottom: 10px;
-}
-
+/* Label Styling */
 #debug-hud label {
   display: block;
   margin-bottom: 5px;
   font-size: 14px;
 }
 
+#debug-hud .checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+#debug-hud .checkbox-group input[type='checkbox'] {
+  width: auto;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
 #debug-hud input[type='color'],
-#debug-hud input[type='range'],
-#debug-hud input[type='checkbox'] {
-  display: block;
+#debug-hud input[type='range'] {
   width: 100%;
-  margin-bottom: 5px;
+  margin-bottom: 10px;
   cursor: pointer;
 }
 
@@ -79,20 +96,32 @@ body {
   height: 25px;
 }
 
+/* Light Controls Specific Styling */
 #debug-hud #light-controls div {
   background-color: rgba(255, 255, 255, 0.1);
-  padding: 5px;
-  border-radius: 3px;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 10px;
 }
 
-#debug-hud input[type='checkbox'] {
-  width: auto;
-  margin-right: 5px;
-  display: inline-block;
+/* Tone Mapping Controls Styling */
+#tone-mapping-controls label,
+#tone-mapping-controls select,
+#tone-mapping-controls input[type='range'] {
+  margin-bottom: 10px;
 }
 
-#debug-hud label {
-  display: inline-block;
-  font-size: 14px;
-  margin-bottom: 0;
+/* Optional: Responsive Adjustments */
+@media (max-width: 600px) {
+  #debug-hud {
+    width: 95%;
+    left: 2.5%;
+    top: 10px;
+    padding: 10px;
+  }
+
+  #minimap-container {
+    width: 150px;
+    height: 150px;
+  }
 }
